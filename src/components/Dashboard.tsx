@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import {
@@ -14,27 +15,15 @@ import {
   Send
 } from 'lucide-react';
 import { useAuth } from '@/lib/api';
-import EmergencyContacts from './EmergencyContacts';
-import LocationSharing from './LocationSharing';
-import Community from './Community';
-import CommunityFeatures from './CommunityFeatures';
-import Alerts from './Alerts';
-import SettingsPage from './SettingsPage';
-import Wellness from './Wellness';
-import EmergencySOS from './EmergencySOS';
-import ContactsManager from './ContactsManager';
-import FirebaseTest from './FirebaseTest';
 
 interface DashboardProps {
   onLogout: () => void;
 }
 
-type ActiveSection = 'dashboard' | 'emergency' | 'location' | 'community' | 'alerts' | 'settings' | 'wellness' | 'sos' | 'contacts' | 'firebase';
-
 const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
-  const [activeSection, setActiveSection] = useState<ActiveSection>('dashboard');
   const [sosActive, setSosActive] = useState(false);
   const [currentUser, setCurrentUser] = useState<any>(null);
+  const navigate = useNavigate();
 
   const { getCurrentUser } = useAuth();
 
@@ -45,37 +34,8 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
   }, []); // ✅ Empty dependency array - only run once on mount
 
   const handleSOS = () => {
-    setActiveSection('sos');
+    navigate('/sos');
   };
-
-  // Route to different sections
-  if (activeSection === 'emergency') {
-    return <EmergencyContacts onBack={() => setActiveSection('dashboard')} />;
-  }
-  if (activeSection === 'location') {
-    return <LocationSharing onBack={() => setActiveSection('dashboard')} />;
-  }
-  if (activeSection === 'community') {
-    return <CommunityFeatures onBack={() => setActiveSection('dashboard')} />;
-  }
-  if (activeSection === 'alerts') {
-    return <Alerts onBack={() => setActiveSection('dashboard')} />;
-  }
-  if (activeSection === 'settings') {
-    return <SettingsPage onBack={() => setActiveSection('dashboard')} />;
-  }
-  if (activeSection === 'wellness') {
-    return <Wellness onBack={() => setActiveSection('dashboard')} />;
-  }
-  if (activeSection === 'sos') {
-    return <EmergencySOS onBack={() => setActiveSection('dashboard')} />;
-  }
-  if (activeSection === 'contacts') {
-    return <ContactsManager onBack={() => setActiveSection('dashboard')} />;
-  }
-  if (activeSection === 'firebase') {
-    return <FirebaseTest onBack={() => setActiveSection('dashboard')} />;
-  }
 
   return (
     <div className="min-h-screen bg-gradient-hero">
@@ -113,9 +73,9 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
       <div className="max-w-md mx-auto p-4 space-y-6">
         {/* Main Action Buttons */}
         <div className="grid grid-cols-2 gap-4">
-          <Card 
-            className="shadow-soft hover:shadow-primary transition-all cursor-pointer hover:scale-[1.02]" 
-            onClick={() => setActiveSection('emergency')}
+          <Card
+            className="shadow-soft hover:shadow-primary transition-all cursor-pointer hover:scale-[1.02]"
+            onClick={() => navigate('/emergency')}
           >
             <CardContent className="p-6 text-center">
               <div className="w-12 h-12 bg-emergency/20 rounded-full flex items-center justify-center mx-auto mb-3">
@@ -126,9 +86,9 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
             </CardContent>
           </Card>
 
-          <Card 
-            className="shadow-soft hover:shadow-primary transition-all cursor-pointer hover:scale-[1.02]" 
-            onClick={() => setActiveSection('location')}
+          <Card
+            className="shadow-soft hover:shadow-primary transition-all cursor-pointer hover:scale-[1.02]"
+            onClick={() => navigate('/location')}
           >
             <CardContent className="p-6 text-center">
               <div className="w-12 h-12 bg-primary/20 rounded-full flex items-center justify-center mx-auto mb-3">
@@ -169,7 +129,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
         <div className="grid grid-cols-2 gap-4">
           <Card
             className="shadow-soft hover:shadow-primary transition-all cursor-pointer hover:scale-[1.02]"
-            onClick={() => setActiveSection('community')}
+            onClick={() => navigate('/community')}
           >
             <CardContent className="p-6 text-center">
               <div className="w-12 h-12 bg-primary/20 rounded-full flex items-center justify-center mx-auto mb-3">
@@ -182,7 +142,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
 
           <Card
             className="shadow-soft hover:shadow-primary transition-all cursor-pointer hover:scale-[1.02]"
-            onClick={() => setActiveSection('contacts')}
+            onClick={() => navigate('/contacts')}
           >
             <CardContent className="p-6 text-center">
               <div className="w-12 h-12 bg-success/20 rounded-full flex items-center justify-center mx-auto mb-3">
@@ -195,7 +155,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
 
           <Card
             className="shadow-soft hover:shadow-primary transition-all cursor-pointer hover:scale-[1.02]"
-            onClick={() => setActiveSection('wellness')}
+            onClick={() => navigate('/wellness')}
           >
             <CardContent className="p-6 text-center">
               <div className="w-12 h-12 bg-accent/20 rounded-full flex items-center justify-center mx-auto mb-3">
@@ -208,7 +168,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
 
           <Card
             className="shadow-soft hover:shadow-primary transition-all cursor-pointer hover:scale-[1.02]"
-            onClick={() => setActiveSection('alerts')}
+            onClick={() => navigate('/alerts')}
           >
             <CardContent className="p-6 text-center">
               <div className="w-12 h-12 bg-secondary/40 rounded-full flex items-center justify-center mx-auto mb-3">
@@ -221,14 +181,14 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
 
           <Card
             className="shadow-soft hover:shadow-primary transition-all cursor-pointer hover:scale-[1.02]"
-            onClick={() => setActiveSection('firebase')}
+            onClick={() => navigate('/settings')}
           >
             <CardContent className="p-6 text-center">
               <div className="w-12 h-12 bg-blue-500/20 rounded-full flex items-center justify-center mx-auto mb-3">
                 <Settings className="w-6 h-6 text-blue-500" />
               </div>
-              <h3 className="font-bold text-foreground mb-1">Firebase Setup</h3>
-              <p className="text-sm text-muted-foreground">Test notifications</p>
+              <h3 className="font-bold text-foreground mb-1">Settings</h3>
+              <p className="text-sm text-muted-foreground">App preferences</p>
             </CardContent>
           </Card>
         </div>

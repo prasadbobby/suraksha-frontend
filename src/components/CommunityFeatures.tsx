@@ -25,6 +25,7 @@ import {
   MessageCircle
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { useVoice, useContacts, Contact } from '@/lib/api';
 
 interface CommunityFeaturesProps {
   onBack: () => void;
@@ -34,13 +35,47 @@ const CommunityFeatures: React.FC<CommunityFeaturesProps> = ({ onBack }) => {
   const [voiceGuidanceEnabled, setVoiceGuidanceEnabled] = useState(false);
   const [isListening, setIsListening] = useState(false);
   const [currentLocation, setCurrentLocation] = useState<{lat: number, lng: number} | null>(null);
-  const [verifiedHelpers, setVerifiedHelpers] = useState([
-    { id: '1', name: 'Priya Sharma', distance: '0.5km', rating: 4.9, verified: true, available: true },
-    { id: '2', name: 'Rajesh Kumar', distance: '0.8km', rating: 4.8, verified: true, available: true },
-    { id: '3', name: 'Anjali Singh', distance: '1.2km', rating: 4.7, verified: true, available: false }
-  ]);
+  const [verifiedHelpers, setVerifiedHelpers] = useState<any[]>([]);
+  const [contacts, setContacts] = useState<Contact[]>([]);
 
   const { toast } = useToast();
+  const { generateVoiceAudio } = useVoice();
+  const { getContacts } = useContacts();
+
+  // Load contacts from API
+  useEffect(() => {
+    const loadContacts = async () => {
+      try {
+        const response = await getContacts();
+        if (response.success && response.contacts) {
+          setContacts(response.contacts);
+          // Convert trusted contacts to verified helpers format
+          const helpers = response.contacts
+            .filter((contact: Contact) => contact.isTrusted)
+            .map((contact: Contact, index: number) => ({
+              id: contact._id || contact.id || index.toString(),
+              name: contact.name,
+              distance: contact.distance ? `${contact.distance}km` : `${(Math.random() * 2).toFixed(1)}km`, // Random distance if not available
+              rating: 4.5 + Math.random() * 0.5, // Random rating between 4.5-5.0
+              verified: true,
+              available: true,
+              phone: contact.phone,
+              relation: contact.relation
+            }));
+          setVerifiedHelpers(helpers);
+        }
+      } catch (error) {
+        console.error('Error loading contacts:', error);
+        toast({
+          title: "Error",
+          description: "Failed to load contacts",
+          variant: "destructive"
+        });
+      }
+    };
+
+    loadContacts();
+  }, [getContacts, toast]);
 
   // Get current location
   useEffect(() => {
@@ -61,21 +96,26 @@ const CommunityFeatures: React.FC<CommunityFeaturesProps> = ({ onBack }) => {
 
   const handleVoiceCommand = async (command: string) => {
     try {
-      // Use Eleven Labs API for voice response
-      const response = await fetch('/api/voice/generate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: getResponseText(command), command })
-      });
+      // Use backend API for voice response
+      const response = await generateVoiceAudio(getResponseText(command), command);
 
-      if (response.ok) {
-        const audioBlob = await response.blob();
+      if (response.success && response.audioUrl) {
+        const audio = new Audio(response.audioUrl);
+        await audio.play();
+      } else if (response.data) {
+        // Handle binary audio data if returned
+        const audioBlob = new Blob([response.data], { type: 'audio/mpeg' });
         const audioUrl = URL.createObjectURL(audioBlob);
         const audio = new Audio(audioUrl);
         await audio.play();
       }
     } catch (error) {
       console.error('Voice command error:', error);
+      toast({
+        title: "Voice Error",
+        description: "Failed to generate voice response",
+        variant: "destructive"
+      });
     }
   };
 
@@ -256,7 +296,14 @@ const CommunityFeatures: React.FC<CommunityFeaturesProps> = ({ onBack }) => {
             <p className="text-sm text-muted-foreground">KYC-verified community members ready to help</p>
           </CardHeader>
           <CardContent className="space-y-3">
-            {verifiedHelpers.map((helper) => (
+            {verifiedHelpers.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                <UserCheck className="w-12 h-12 text-muted-foreground/50 mx-auto mb-3" />
+                <p>No trusted contacts available</p>
+                <p className="text-sm">Add trusted contacts in the Contacts section to see verified helpers</p>
+              </div>
+            ) : (
+              verifiedHelpers.map((helper) => (
               <div
                 key={helper.id}
                 className="flex items-center justify-between p-3 bg-card rounded-lg border border-border"
@@ -296,7 +343,8 @@ const CommunityFeatures: React.FC<CommunityFeaturesProps> = ({ onBack }) => {
                   Contact
                 </Button>
               </div>
-            ))}
+              ))
+            )}
           </CardContent>
         </Card>
 

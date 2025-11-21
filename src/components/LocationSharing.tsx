@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
@@ -10,6 +10,19 @@ import { useToast } from '@/hooks/use-toast';
 interface LocationSharingProps {
   onBack: () => void;
 }
+
+// Utility function to calculate distance between two coordinates (in kilometers)
+const calculateDistance = (lat1: number, lng1: number, lat2: number, lng2: number): number => {
+  const R = 6371; // Radius of Earth in kilometers
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLng = (lng2 - lng1) * Math.PI / 180;
+  const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+    Math.sin(dLng / 2) * Math.sin(dLng / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  const distance = R * c;
+  return distance;
+};
 
 const LocationSharing: React.FC<LocationSharingProps> = ({ onBack }) => {
   const [locationEnabled, setLocationEnabled] = useState(true);
@@ -29,10 +42,22 @@ const LocationSharing: React.FC<LocationSharingProps> = ({ onBack }) => {
   const { getContacts } = useContacts();
   const { shareLocation } = useLocation();
 
-  // Load trusted contacts from database
+  // Load trusted contacts from database and persistent sharing state
   useEffect(() => {
     loadTrustedContacts();
+    loadPersistedSharingState();
   }, []);
+
+  // Save sharing state when it changes
+  useEffect(() => {
+    if (liveSharing) {
+      localStorage.setItem('suraksha_live_sharing', 'true');
+      localStorage.setItem('suraksha_sharing_start_time', new Date().toISOString());
+    } else {
+      localStorage.removeItem('suraksha_live_sharing');
+      localStorage.removeItem('suraksha_sharing_start_time');
+    }
+  }, [liveSharing]);
 
   // Get current location
   useEffect(() => {
@@ -65,6 +90,32 @@ const LocationSharing: React.FC<LocationSharingProps> = ({ onBack }) => {
         description: "Unable to load trusted contacts. Please check your connection.",
         variant: "destructive"
       });
+    }
+  };
+
+  const loadPersistedSharingState = () => {
+    try {
+      const wasSharing = localStorage.getItem('suraksha_live_sharing') === 'true';
+      const startTimeStr = localStorage.getItem('suraksha_sharing_start_time');
+
+      if (wasSharing && startTimeStr) {
+        const startTime = new Date(startTimeStr);
+        const now = new Date();
+        const hoursSinceStart = (now.getTime() - startTime.getTime()) / (1000 * 60 * 60);
+
+        // Only restore if less than 24 hours have passed (default sharing duration)
+        if (hoursSinceStart < 24) {
+          setLiveSharing(true);
+          console.log(`🔄 Restored live sharing session (${Math.round(hoursSinceStart * 100) / 100} hours ago)`);
+        } else {
+          // Session expired, clean up
+          localStorage.removeItem('suraksha_live_sharing');
+          localStorage.removeItem('suraksha_sharing_start_time');
+          console.log('⏰ Live sharing session expired, cleaned up');
+        }
+      }
+    } catch (error) {
+      console.error('Error loading persisted sharing state:', error);
     }
   };
 
@@ -138,20 +189,41 @@ const LocationSharing: React.FC<LocationSharingProps> = ({ onBack }) => {
         await getCurrentLocationAsync();
 
         if (currentLocation) {
+          // Get trusted contact IDs for notification (only contacts with email)
+          const trustedContactIds = trustedContacts
+            .filter(contact =>
+              contact.isTrusted &&
+              contact.notificationsEnabled !== false &&
+              contact.email &&
+              contact.email.trim() !== ''
+            )
+            .map(contact => contact._id || contact.id);
+
           // Share location with trusted contacts via API
           const response = await shareLocation({
             latitude: currentLocation.lat,
             longitude: currentLocation.lng,
             address: currentLocation.address,
+            contactIds: trustedContactIds,
+            duration: 24, // 24 hours
             accuracy: 10,
             isLiveSharing: true
           });
 
           if (response.success) {
-            toast({
-              title: "✅ Live Sharing Started",
-              description: `Location shared with ${trustedContacts.length} trusted contacts`,
-            });
+            const notificationCount = response.notificationsSent || trustedContactIds.length;
+            if (notificationCount > 0) {
+              toast({
+                title: "✅ Live Sharing Started",
+                description: `Location shared with ${notificationCount} trusted contacts - Email notifications sent!`,
+              });
+            } else {
+              toast({
+                title: "⚠️ Live Sharing Started",
+                description: "Location tracking active, but no contacts have email addresses for notifications. Add email addresses to your trusted contacts.",
+                variant: "destructive"
+              });
+            }
 
             // Start watching position for continuous updates
             startLocationWatching();
@@ -223,6 +295,10 @@ const LocationSharing: React.FC<LocationSharingProps> = ({ onBack }) => {
     });
   };
 
+  // Debounce function to prevent excessive API calls
+  const debounceTimeoutRef = useRef(null);
+  const lastLocationRef = useRef(null);
+
   const startLocationWatching = () => {
     if (watchId) return; // Already watching
 
@@ -243,18 +319,62 @@ const LocationSharing: React.FC<LocationSharingProps> = ({ onBack }) => {
 
         setCurrentLocation(newLocation);
 
-        // Update location on server
-        try {
-          await shareLocation({
-            latitude,
-            longitude,
-            address: newLocation.address,
-            accuracy: position.coords.accuracy || 10,
-            isLiveSharing: true
-          });
-        } catch (error) {
-          console.error('Error updating live location:', error);
+        // Clear existing timeout
+        if (debounceTimeoutRef.current) {
+          clearTimeout(debounceTimeoutRef.current);
         }
+
+        // Check if location changed significantly (more than ~10 meters)
+        const lastLocation = lastLocationRef.current;
+        if (lastLocation) {
+          const distance = calculateDistance(
+            lastLocation.lat,
+            lastLocation.lng,
+            latitude,
+            longitude
+          );
+
+          // If location hasn't changed significantly (less than 10 meters), don't send update
+          if (distance < 0.01) { // roughly 10 meters
+            return;
+          }
+        }
+
+        // Debounce the API call to prevent excessive requests
+        debounceTimeoutRef.current = setTimeout(async () => {
+          try {
+            // Get trusted contact IDs for continuous updates (only contacts with email)
+            const trustedContactIds = trustedContacts
+              .filter(contact =>
+                contact.isTrusted &&
+                contact.notificationsEnabled !== false &&
+                contact.email &&
+                contact.email.trim() !== ''
+              )
+              .map(contact => contact._id || contact.id);
+
+            // Only send if there are contacts to notify
+            if (trustedContactIds.length === 0) {
+              return;
+            }
+
+            await shareLocation({
+              latitude,
+              longitude,
+              address: newLocation.address,
+              contactIds: trustedContactIds,
+              duration: 24,
+              accuracy: position.coords.accuracy || 10,
+              isLiveSharing: true
+            });
+
+            // Update last sent location
+            lastLocationRef.current = { lat: latitude, lng: longitude };
+
+          } catch (error) {
+            console.error('Error updating live location:', error);
+          }
+        }, 5000); // Wait 5 seconds before sending update (adjustable)
       },
       (error) => console.error('Error watching position:', error),
       options
@@ -419,18 +539,39 @@ const LocationSharing: React.FC<LocationSharingProps> = ({ onBack }) => {
                     onClick={async () => {
                       if (currentLocation) {
                         try {
-                          await shareLocation({
+                          // Get trusted contact IDs for one-time sharing (only contacts with email)
+                          const trustedContactIds = trustedContacts
+                            .filter(contact =>
+                              contact.isTrusted &&
+                              contact.notificationsEnabled !== false &&
+                              contact.email &&
+                              contact.email.trim() !== ''
+                            )
+                            .map(contact => contact._id || contact.id);
+
+                          const response = await shareLocation({
                             latitude: currentLocation.lat,
                             longitude: currentLocation.lng,
                             address: currentLocation.address,
+                            contactIds: trustedContactIds,
+                            duration: 2, // 2 hours for one-time sharing
                             accuracy: 10,
                             isLiveSharing: false
                           });
 
-                          toast({
-                            title: "📍 Location Shared",
-                            description: `Current location sent to ${contact.name}`,
-                          });
+                          const notificationCount = response.notificationsSent || trustedContactIds.length;
+                          if (notificationCount > 0) {
+                            toast({
+                              title: "📍 Location Shared",
+                              description: `Location sent to ${notificationCount} trusted contacts via email!`,
+                            });
+                          } else {
+                            toast({
+                              title: "⚠️ Location Saved",
+                              description: "Location saved but no email notifications sent. Add email addresses to your trusted contacts.",
+                              variant: "destructive"
+                            });
+                          }
                         } catch (error) {
                           toast({
                             title: "❌ Sharing Failed",

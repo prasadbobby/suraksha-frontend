@@ -221,6 +221,18 @@ class ApiService {
   async healthCheck() {
     return this.request('/health');
   }
+
+  // Voice methods
+  async generateVoiceAudio(text: string, command?: string) {
+    return this.request('/voice/generate', {
+      method: 'POST',
+      body: JSON.stringify({ text, command })
+    });
+  }
+
+  async getAvailableVoices() {
+    return this.request('/voice/voices');
+  }
 }
 
 // Type definitions
@@ -229,7 +241,7 @@ export interface Contact {
   id?: string;
   name: string;
   phone: string;
-  email?: string;
+  email?: string; // ✅ Email field for notifications
   relation: string;
   isTrusted: boolean;
   isPriority: boolean;
@@ -325,5 +337,12 @@ export const useProfile = () => {
   return useMemo(() => ({
     getUserProfile: apiService.getUserProfile.bind(apiService),
     updateUserProfile: apiService.updateUserProfile.bind(apiService),
+  }), []); // ✅ Stable references
+};
+
+export const useVoice = () => {
+  return useMemo(() => ({
+    generateVoiceAudio: apiService.generateVoiceAudio.bind(apiService),
+    getAvailableVoices: apiService.getAvailableVoices.bind(apiService),
   }), []); // ✅ Stable references
 };

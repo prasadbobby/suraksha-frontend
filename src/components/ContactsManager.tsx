@@ -460,7 +460,7 @@ const ContactsManager: React.FC<ContactsManagerProps> = ({ onBack }) => {
             ) : (
               filteredContacts.map((contact) => (
                 <div
-                  key={contact.id}
+                  key={contact._id || contact.id || contact.phone}
                   className="flex items-center justify-between p-3 bg-card rounded-lg border border-border hover:border-primary/30 transition-colors"
                 >
                   <div className="flex items-center space-x-3">
