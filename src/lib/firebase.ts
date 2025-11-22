@@ -1,3 +1,15 @@
+/**
+ * Frontend Firebase Configuration
+ *
+ * This file handles CLIENT-SIDE Firebase features only:
+ * - User authentication (Google sign-in)
+ * - Push notification permissions and receiving messages
+ * - Real-time subscriptions
+ * - File uploads
+ *
+ * For API calls (contacts, emergency alerts, location sharing), use /lib/api.ts instead.
+ */
+
 import { initializeApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut } from 'firebase/auth';
 import { getFirestore, doc, setDoc, getDoc, updateDoc, onSnapshot } from 'firebase/firestore';
@@ -85,90 +97,11 @@ export const getUserProfile = async (userId: string) => {
   }
 };
 
-// Emergency contacts functions
-export const saveTrustedContacts = async (userId: string, contacts: any[]) => {
-  try {
-    await setDoc(doc(db, 'trustedContacts', userId), {
-      contacts,
-      updatedAt: new Date()
-    });
-    return { success: true };
-  } catch (error) {
-    console.error('Error saving trusted contacts:', error);
-    return { success: false, error };
-  }
-};
+// Note: Emergency contacts and alerts are now handled by the backend API
+// See /lib/api.ts for the proper API calls to use instead
 
-export const getTrustedContacts = async (userId: string) => {
-  try {
-    const docRef = doc(db, 'trustedContacts', userId);
-    const docSnap = await getDoc(docRef);
-
-    if (docSnap.exists()) {
-      return { success: true, data: docSnap.data().contacts };
-    } else {
-      return { success: true, data: [] };
-    }
-  } catch (error) {
-    console.error('Error getting trusted contacts:', error);
-    return { success: false, error };
-  }
-};
-
-// Emergency alert functions
-export const createEmergencyAlert = async (userId: string, alertData: any) => {
-  try {
-    const alertId = `alert_${Date.now()}`;
-    await setDoc(doc(db, 'emergencyAlerts', alertId), {
-      userId,
-      ...alertData,
-      timestamp: new Date(),
-      status: 'active'
-    });
-
-    // Trigger notifications to trusted contacts
-    await notifyTrustedContacts(userId, alertData);
-
-    return { success: true, alertId };
-  } catch (error) {
-    console.error('Error creating emergency alert:', error);
-    return { success: false, error };
-  }
-};
-
-// Location tracking functions
-export const updateUserLocation = async (userId: string, locationData: any) => {
-  try {
-    await setDoc(doc(db, 'userLocations', userId), {
-      ...locationData,
-      timestamp: new Date()
-    });
-    return { success: true };
-  } catch (error) {
-    console.error('Error updating location:', error);
-    return { success: false, error };
-  }
-};
-
-export const shareLocationWithContacts = async (userId: string, contactIds: string[], locationData: any) => {
-  try {
-    const promises = contactIds.map(contactId =>
-      setDoc(doc(db, 'sharedLocations', `${userId}_${contactId}`), {
-        fromUserId: userId,
-        toContactId: contactId,
-        ...locationData,
-        timestamp: new Date(),
-        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000) // 24 hours
-      })
-    );
-
-    await Promise.all(promises);
-    return { success: true };
-  } catch (error) {
-    console.error('Error sharing location:', error);
-    return { success: false, error };
-  }
-};
+// Note: Location tracking is now handled by the backend API
+// See /lib/api.ts useLocation() hook for proper API calls
 
 // Notification functions
 export const requestNotificationPermission = async () => {
@@ -214,44 +147,7 @@ export const onForegroundMessage = (callback: (payload: any) => void) => {
   return onMessage(messaging, callback);
 };
 
-// Helper function to notify trusted contacts
-const notifyTrustedContacts = async (userId: string, alertData: any) => {
-  try {
-    // Get trusted contacts
-    const contactsResult = await getTrustedContacts(userId);
-    if (!contactsResult.success || !contactsResult.data) {
-      console.log('No trusted contacts found');
-      return;
-    }
-
-    const contacts = contactsResult.data;
-
-    // Create notification payload
-    const notificationData = {
-      title: '🚨 Emergency Alert',
-      body: `${alertData.userName} has activated an emergency alert. Location: ${alertData.location}`,
-      data: {
-        type: 'emergency_alert',
-        userId,
-        location: alertData.location,
-        timestamp: alertData.timestamp
-      }
-    };
-
-    // Send notifications to each contact
-    // In a real implementation, this would call a Firebase Cloud Function
-    // to send push notifications to each contact's device
-    console.log('Sending notifications to contacts:', contacts.length);
-    console.log('Notification data:', notificationData);
-
-    return { success: true };
-  } catch (error) {
-    console.error('Error notifying trusted contacts:', error);
-    return { success: false, error };
-  }
-};
-
-// Real-time location updates
+// Real-time subscriptions and file uploads
 export const subscribeToLocationUpdates = (userId: string, callback: (location: any) => void) => {
   const locationRef = doc(db, 'userLocations', userId);
   return onSnapshot(locationRef, (doc) => {
@@ -261,7 +157,6 @@ export const subscribeToLocationUpdates = (userId: string, callback: (location: 
   });
 };
 
-// Evidence storage functions
 export const uploadEvidence = async (userId: string, file: File, type: 'image' | 'video' | 'audio') => {
   try {
     const filename = `evidence/${userId}/${Date.now()}_${file.name}`;

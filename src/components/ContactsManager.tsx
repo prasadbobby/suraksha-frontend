@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import {
   ArrowLeft,
   Users,
@@ -33,6 +34,15 @@ const ContactsManager: React.FC<ContactsManagerProps> = ({ onBack }) => {
   const [syncEnabled, setSyncEnabled] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [newContact, setNewContact] = useState<Partial<Contact>>({
+    name: '',
+    phone: '',
+    email: '',
+    relation: '',
+    isTrusted: false,
+    isPriority: false,
+    notificationsEnabled: true
+  });
+  const [editFormData, setEditFormData] = useState<Partial<Contact>>({
     name: '',
     phone: '',
     email: '',
@@ -277,6 +287,103 @@ const ContactsManager: React.FC<ContactsManagerProps> = ({ onBack }) => {
     });
   };
 
+  // Edit contact handlers
+  const openEditDialog = (contact: Contact) => {
+    setEditingContact(contact);
+    setEditFormData({
+      name: contact.name,
+      phone: contact.phone,
+      email: contact.email || '',
+      relation: contact.relation,
+      isTrusted: contact.isTrusted,
+      isPriority: contact.isPriority,
+      notificationsEnabled: contact.notificationsEnabled
+    });
+  };
+
+  const closeEditDialog = () => {
+    setEditingContact(null);
+    setEditFormData({
+      name: '',
+      phone: '',
+      email: '',
+      relation: '',
+      isTrusted: false,
+      isPriority: false,
+      notificationsEnabled: true
+    });
+  };
+
+  const saveEditedContact = async () => {
+    if (!editingContact) return;
+
+    // Validate required fields
+    if (!editFormData.name?.trim() || !editFormData.phone?.trim() || !editFormData.relation?.trim()) {
+      toast({
+        title: "Missing Information",
+        description: "Please fill in all required fields (name, phone, relation).",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    // Phone validation
+    const phoneRegex = /^[+]?[\d\s\-()]+$/;
+    if (!phoneRegex.test(editFormData.phone)) {
+      toast({
+        title: "Invalid Phone Number",
+        description: "Please enter a valid phone number.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    // Email validation (optional)
+    if (editFormData.email && editFormData.email.trim() !== '') {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(editFormData.email)) {
+        toast({
+          title: "Invalid Email",
+          description: "Please enter a valid email address.",
+          variant: "destructive"
+        });
+        return;
+      }
+    }
+
+    setIsLoading(true);
+    try {
+      const response = await updateContact(editingContact._id || editingContact.id, editFormData);
+
+      if (response.success && response.contact) {
+        setContacts(contacts.map(contact =>
+          (contact._id || contact.id) === (editingContact._id || editingContact.id) ? response.contact : contact
+        ));
+
+        closeEditDialog();
+        toast({
+          title: "✅ Contact Updated",
+          description: `${editFormData.name} has been updated successfully.`
+        });
+      } else {
+        toast({
+          title: "Failed to update contact",
+          description: response.error || "Could not update contact",
+          variant: "destructive"
+        });
+      }
+    } catch (error) {
+      console.error('Error updating contact:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update contact. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gradient-hero">
       {/* Header */}
@@ -300,7 +407,7 @@ const ContactsManager: React.FC<ContactsManagerProps> = ({ onBack }) => {
         </div>
       </header>
 
-      <div className="max-w-md mx-auto p-4 space-y-6">
+      <div className="max-w-md mx-auto p-4 space-y-6 pb-24">
         {/* Quick Stats */}
         <div className="grid grid-cols-3 gap-4">
           <Card className="shadow-soft text-center">
@@ -525,6 +632,13 @@ const ContactsManager: React.FC<ContactsManagerProps> = ({ onBack }) => {
                       <Button
                         size="sm"
                         variant="outline"
+                        onClick={() => openEditDialog(contact)}
+                      >
+                        <Edit className="w-4 h-4" />
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
                         onClick={() => deleteContactHandler(contact._id || contact.id)}
                       >
                         <Trash2 className="w-4 h-4" />
@@ -555,6 +669,126 @@ const ContactsManager: React.FC<ContactsManagerProps> = ({ onBack }) => {
           </CardContent>
         </Card>
       </div>
+
+      {/* Edit Contact Dialog */}
+      <Dialog open={!!editingContact} onOpenChange={closeEditDialog}>
+        <DialogContent className="max-w-md mx-auto">
+          <DialogHeader>
+            <DialogTitle className="text-lg font-semibold text-foreground">
+              Edit Contact
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="edit-name" className="text-sm font-medium text-foreground">
+                Name *
+              </Label>
+              <Input
+                id="edit-name"
+                type="text"
+                value={editFormData.name}
+                onChange={(e) => setEditFormData({ ...editFormData, name: e.target.value })}
+                placeholder="Enter contact name"
+                className="mt-1"
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="edit-relation" className="text-sm font-medium text-foreground">
+                Relation *
+              </Label>
+              <Input
+                id="edit-relation"
+                type="text"
+                value={editFormData.relation}
+                onChange={(e) => setEditFormData({ ...editFormData, relation: e.target.value })}
+                placeholder="e.g., Mother, Friend, Sister"
+                className="mt-1"
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="edit-phone" className="text-sm font-medium text-foreground">
+                Phone Number *
+              </Label>
+              <Input
+                id="edit-phone"
+                type="tel"
+                value={editFormData.phone}
+                onChange={(e) => setEditFormData({ ...editFormData, phone: e.target.value })}
+                placeholder="+1234567890"
+                className="mt-1"
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="edit-email" className="text-sm font-medium text-foreground">
+                Email (Optional)
+              </Label>
+              <Input
+                id="edit-email"
+                type="email"
+                value={editFormData.email}
+                onChange={(e) => setEditFormData({ ...editFormData, email: e.target.value })}
+                placeholder="contact@example.com"
+                className="mt-1"
+              />
+            </div>
+
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <Label className="text-sm font-medium text-foreground">Trusted Contact</Label>
+                  <p className="text-xs text-muted-foreground">Receives emergency alerts</p>
+                </div>
+                <Switch
+                  checked={editFormData.isTrusted}
+                  onCheckedChange={(checked) => setEditFormData({ ...editFormData, isTrusted: checked })}
+                />
+              </div>
+
+              <div className="flex items-center justify-between">
+                <div>
+                  <Label className="text-sm font-medium text-foreground">Priority Contact</Label>
+                  <p className="text-xs text-muted-foreground">Notified first in emergencies</p>
+                </div>
+                <Switch
+                  checked={editFormData.isPriority}
+                  onCheckedChange={(checked) => setEditFormData({ ...editFormData, isPriority: checked })}
+                />
+              </div>
+
+              <div className="flex items-center justify-between">
+                <div>
+                  <Label className="text-sm font-medium text-foreground">Enable Notifications</Label>
+                  <p className="text-xs text-muted-foreground">Allow notifications from this app</p>
+                </div>
+                <Switch
+                  checked={editFormData.notificationsEnabled}
+                  onCheckedChange={(checked) => setEditFormData({ ...editFormData, notificationsEnabled: checked })}
+                />
+              </div>
+            </div>
+
+            <div className="flex space-x-3 pt-4">
+              <Button
+                variant="outline"
+                onClick={closeEditDialog}
+                className="flex-1"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={saveEditedContact}
+                disabled={isLoading || !editFormData.name?.trim() || !editFormData.phone?.trim() || !editFormData.relation?.trim()}
+                className="flex-1"
+              >
+                {isLoading ? "Saving..." : "Save Changes"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

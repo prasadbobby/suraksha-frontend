@@ -1,25 +1,100 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
-import { ArrowLeft, Settings, EyeOff, Shield, Users, Phone, Camera, Watch } from 'lucide-react';
+import { ArrowLeft, Settings, EyeOff, Shield, Users, Phone, Camera, Watch, TestTube } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
+import { useProfile, useAuth } from '@/lib/api';
+import FirebaseTest from './FirebaseTest';
 
 interface SettingsPageProps {
   onBack: () => void;
 }
 
 const SettingsPage: React.FC<SettingsPageProps> = ({ onBack }) => {
+  const { toast } = useToast();
+  const { getUserProfile, updateSafetySettings } = useProfile();
+
+  const [loading, setLoading] = useState(true);
   const [settings, setSettings] = useState({
     stealthMode: false,
     autoRecording: true,
-    familyFirst: true,
     includeLocation: true,
-    wearableSync: false,
-    biometricLock: true
+    biometricLock: true,
+    wearableSync: false
   });
 
-  const updateSetting = (key: keyof typeof settings) => {
-    setSettings(prev => ({ ...prev, [key]: !prev[key] }));
+  const [showFirebaseTest, setShowFirebaseTest] = useState(false);
+
+  useEffect(() => {
+    loadUserSettings();
+  }, []);
+
+  const loadUserSettings = async () => {
+    try {
+      setLoading(true);
+
+      const response = await getUserProfile();
+
+      if (response.success && response.data?.user?.safetySettings) {
+        const safetySettings = response.data.user.safetySettings;
+        setSettings({
+          stealthMode: safetySettings.stealthMode ?? false,
+          autoRecording: safetySettings.autoRecording ?? true,
+          includeLocation: safetySettings.includeLocation ?? true,
+          biometricLock: safetySettings.biometricLock ?? true,
+          wearableSync: false // This is not a safety setting, so keep local
+        });
+      }
+    } catch (error) {
+      console.error('Failed to load user settings:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load settings. Using defaults.",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const updateSetting = async (key: keyof typeof settings) => {
+    const newValue = !settings[key];
+
+    // For non-safety settings, just update locally
+    if (key === 'wearableSync') {
+      setSettings(prev => ({ ...prev, [key]: newValue }));
+      return;
+    }
+
+    try {
+      // Update local state immediately for better UX
+      setSettings(prev => ({ ...prev, [key]: newValue }));
+
+      // Save safety settings to backend
+      const response = await updateSafetySettings({
+        [key]: newValue
+      });
+
+      if (response.success) {
+        toast({
+          title: "Setting Updated",
+          description: `${key.replace(/([A-Z])/g, ' $1').toLowerCase()} has been ${newValue ? 'enabled' : 'disabled'}.`,
+        });
+      } else {
+        throw new Error(response.error || 'Failed to update setting');
+      }
+    } catch (error) {
+      // Revert the change if it failed
+      setSettings(prev => ({ ...prev, [key]: !newValue }));
+
+      console.error('Failed to update setting:', error);
+      toast({
+        title: "Error",
+        description: "Failed to save setting. Please try again.",
+        variant: "destructive"
+      });
+    }
   };
 
   const sosContacts = [
@@ -52,7 +127,15 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ onBack }) => {
         </div>
       </header>
 
-      <div className="max-w-md mx-auto p-4 space-y-6">
+      <div className="max-w-md mx-auto p-4 space-y-6 pb-24">
+        {/* Loading State */}
+        {loading ? (
+          <div className="text-center py-8">
+            <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+            <p className="text-muted-foreground">Loading settings...</p>
+          </div>
+        ) : (
+          <>
         {/* Stealth Mode */}
         <Card className="shadow-soft">
           <CardHeader>
@@ -224,7 +307,37 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ onBack }) => {
             </div>
           </CardContent>
         </Card>
+
+        {/* Developer/Debug Section */}
+        <Card className="shadow-soft bg-yellow-50 border-yellow-200">
+          <CardHeader>
+            <CardTitle className="text-lg text-foreground flex items-center">
+              <TestTube className="w-5 h-5 mr-2 text-yellow-600" />
+              Developer Tools
+            </CardTitle>
+            <p className="text-sm text-muted-foreground">Debug and test app functionality</p>
+          </CardHeader>
+          <CardContent>
+            <Button
+              variant="outline"
+              onClick={() => setShowFirebaseTest(true)}
+              className="w-full justify-start border-yellow-200 hover:bg-yellow-50"
+            >
+              <TestTube className="w-4 h-4 mr-2" />
+              Test Firebase & Notifications
+            </Button>
+          </CardContent>
+        </Card>
+          </>
+        )}
       </div>
+
+      {/* Firebase Test Modal/Overlay */}
+      {showFirebaseTest && (
+        <div className="fixed inset-0 z-50">
+          <FirebaseTest onBack={() => setShowFirebaseTest(false)} />
+        </div>
+      )}
     </div>
   );
 };

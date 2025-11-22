@@ -15,6 +15,7 @@ import {
   Send
 } from 'lucide-react';
 import { useAuth } from '@/lib/api';
+import { useFirebaseNotifications } from '@/hooks/useFirebaseNotifications';
 
 interface DashboardProps {
   onLogout: () => void;
@@ -27,11 +28,22 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
 
   const { getCurrentUser } = useAuth();
 
+  // 🔔 Initialize Firebase notifications
+  const { notificationToken, permissionGranted } = useFirebaseNotifications();
+
   // Load current user on component mount
   useEffect(() => {
     const user = getCurrentUser();
     setCurrentUser(user);
   }, []); // ✅ Empty dependency array - only run once on mount
+
+  // Log notification status for debugging
+  useEffect(() => {
+    console.log('🔔 Notification permission granted:', permissionGranted);
+    if (notificationToken) {
+      console.log('📱 Notification token received:', notificationToken.substring(0, 20) + '...');
+    }
+  }, [permissionGranted, notificationToken]);
 
   const handleSOS = () => {
     navigate('/sos');
@@ -70,7 +82,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
         </div>
       </header>
 
-      <div className="max-w-md mx-auto p-4 space-y-6">
+      <div className="max-w-md mx-auto p-4 space-y-6 pb-24">
         {/* Main Action Buttons */}
         <div className="grid grid-cols-2 gap-4">
           <Card

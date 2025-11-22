@@ -1,0 +1,169 @@
+/* Bottom Navigation Styles - Adapted from provided design */
+
+.bottom-nav {
+  display: flex;
+  flex-direction: row;
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  width: 100%;
+  max-width: 450px; /* Mobile-friendly max width */
+  margin: 0 auto;
+  background-color: #ffffff;
+  padding: 15px 20px 25px 20px; /* Extra bottom padding for mobile safe area */
+  border-top-left-radius: 30px;
+  border-top-right-radius: 30px;
+  box-shadow: 0px -5px 40px rgba(0, 0, 0, 0.15);
+  z-index: 1000;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+.nav-item {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  flex-grow: 1;
+  padding: 12px 15px;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  border-radius: 25px;
+  position: relative;
+  min-height: 50px;
+}
+
+.nav-item:hover {
+  transform: translateY(-2px);
+  background-color: rgba(0, 0, 0, 0.05);
+}
+
+.nav-icon-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s ease;
+}
+
+.nav-icon {
+  font-size: 24px;
+  width: 24px;
+  height: 24px;
+  color: #666;
+  transition: all 0.3s ease;
+}
+
+.nav-text {
+  font-size: 14px;
+  font-weight: 500;
+  margin-left: 8px;
+  display: none;
+  transition: all 0.3s ease;
+  color: #666;
+  white-space: nowrap;
+}
+
+/* Active state styles */
+.nav-item.active {
+  flex-grow: 2.5;
+  background: linear-gradient(135deg, hsl(var(--primary) / 0.1), hsl(var(--primary) / 0.05));
+  justify-content: flex-start;
+  padding-left: 20px;
+  backdrop-filter: blur(10px);
+  border: 1px solid hsl(var(--primary) / 0.2);
+  box-shadow: var(--shadow-soft);
+}
+
+.nav-item.active .nav-text {
+  display: inline-block;
+  color: hsl(var(--primary));
+  font-weight: 600;
+}
+
+.nav-item.active .nav-icon {
+  color: hsl(var(--primary));
+  transform: scale(1.1);
+}
+
+.nav-item.active .nav-icon-wrapper {
+  margin-right: 8px;
+}
+
+/* Mobile responsiveness */
+@media (max-width: 480px) {
+  .bottom-nav {
+    padding: 12px 15px 20px 15px;
+  }
+
+  .nav-item {
+    padding: 10px 12px;
+    min-height: 45px;
+  }
+
+  .nav-item.active {
+    flex-grow: 2.2;
+    padding-left: 16px;
+  }
+
+  .nav-text {
+    font-size: 13px;
+  }
+
+  .nav-icon {
+    width: 22px;
+    height: 22px;
+  }
+}
+
+/* Dark mode support */
+@media (prefers-color-scheme: dark) {
+  .bottom-nav {
+    background-color: hsl(var(--card));
+    border-top: 1px solid hsl(var(--border));
+  }
+
+  .nav-item:hover {
+    background-color: hsl(var(--accent));
+  }
+
+  .nav-item.active {
+    background: linear-gradient(135deg, hsl(var(--primary) / 0.15), hsl(var(--primary) / 0.1));
+    border: 1px solid hsl(var(--primary) / 0.3);
+  }
+
+  .nav-item.active .nav-icon,
+  .nav-item.active .nav-text {
+    color: hsl(var(--primary));
+  }
+
+  .nav-icon {
+    color: hsl(var(--muted-foreground));
+  }
+
+  .nav-text {
+    color: hsl(var(--muted-foreground));
+  }
+}
+
+/* Animation for smooth transitions */
+.nav-item {
+  animation: fadeIn 0.5s ease-in-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Safe area for iOS devices */
+@supports (padding-bottom: env(safe-area-inset-bottom)) {
+  .bottom-nav {
+    padding-bottom: calc(20px + env(safe-area-inset-bottom));
+  }
+}

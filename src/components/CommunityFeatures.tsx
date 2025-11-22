@@ -12,8 +12,6 @@ import {
   Shield,
   Navigation,
   Heart,
-  Mic,
-  Volume2,
   Route,
   Brain,
   Phone,
@@ -25,21 +23,18 @@ import {
   MessageCircle
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { useVoice, useContacts, Contact } from '@/lib/api';
+import { useContacts, Contact } from '@/lib/api';
 
 interface CommunityFeaturesProps {
   onBack: () => void;
 }
 
 const CommunityFeatures: React.FC<CommunityFeaturesProps> = ({ onBack }) => {
-  const [voiceGuidanceEnabled, setVoiceGuidanceEnabled] = useState(false);
-  const [isListening, setIsListening] = useState(false);
   const [currentLocation, setCurrentLocation] = useState<{lat: number, lng: number} | null>(null);
   const [verifiedHelpers, setVerifiedHelpers] = useState<any[]>([]);
   const [contacts, setContacts] = useState<Contact[]>([]);
 
   const { toast } = useToast();
-  const { generateVoiceAudio } = useVoice();
   const { getContacts } = useContacts();
 
   // Load contacts from API
@@ -94,93 +89,6 @@ const CommunityFeatures: React.FC<CommunityFeaturesProps> = ({ onBack }) => {
     }
   }, []);
 
-  const handleVoiceCommand = async (command: string) => {
-    try {
-      // Use backend API for voice response
-      const response = await generateVoiceAudio(getResponseText(command), command);
-
-      if (response.success && response.audioUrl) {
-        const audio = new Audio(response.audioUrl);
-        await audio.play();
-      } else if (response.data) {
-        // Handle binary audio data if returned
-        const audioBlob = new Blob([response.data], { type: 'audio/mpeg' });
-        const audioUrl = URL.createObjectURL(audioBlob);
-        const audio = new Audio(audioUrl);
-        await audio.play();
-      }
-    } catch (error) {
-      console.error('Voice command error:', error);
-      toast({
-        title: "Voice Error",
-        description: "Failed to generate voice response",
-        variant: "destructive"
-      });
-    }
-  };
-
-  const getResponseText = (command: string): string => {
-    switch (command.toLowerCase()) {
-      case 'emergency':
-        return "Emergency mode activated. Sending alert to all trusted contacts. Stay calm, help is on the way.";
-      case 'safe route':
-        return "Finding the safest route to your destination. I'll guide you through well-lit areas with police presence.";
-      case 'call help':
-        return "Calling emergency services and your trusted contacts now. Stay on the line.";
-      default:
-        return "I'm here to help keep you safe. What do you need assistance with?";
-    }
-  };
-
-  const startVoiceListening = () => {
-    if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
-      const SpeechRecognition = (window as any).webkitSpeechRecognition || (window as any).SpeechRecognition;
-      const recognition = new SpeechRecognition();
-
-      recognition.continuous = false;
-      recognition.interimResults = false;
-      recognition.lang = 'en-US';
-
-      recognition.onstart = () => {
-        setIsListening(true);
-        toast({
-          title: "🎤 Listening...",
-          description: "Say 'Hey SURAKSHA' followed by your command"
-        });
-      };
-
-      recognition.onresult = (event: any) => {
-        const transcript = event.results[0][0].transcript.toLowerCase();
-
-        if (transcript.includes('hey suraksha')) {
-          if (transcript.includes('emergency')) {
-            handleVoiceCommand('emergency');
-          } else if (transcript.includes('safe route')) {
-            handleVoiceCommand('safe route');
-          } else if (transcript.includes('call help')) {
-            handleVoiceCommand('call help');
-          }
-        }
-      };
-
-      recognition.onerror = (event: any) => {
-        console.error('Speech recognition error:', event.error);
-        setIsListening(false);
-      };
-
-      recognition.onend = () => {
-        setIsListening(false);
-      };
-
-      recognition.start();
-    } else {
-      toast({
-        title: "Voice Commands Not Supported",
-        description: "Your browser doesn't support voice recognition.",
-        variant: "destructive"
-      });
-    }
-  };
 
   const planSafeRoute = () => {
     toast({
@@ -197,24 +105,6 @@ const CommunityFeatures: React.FC<CommunityFeaturesProps> = ({ onBack }) => {
     }, 2000);
   };
 
-  const testAIGuide = () => {
-    const guidance = [
-      "You are in danger. Stay calm. I am guiding you to the safest route.",
-      "Move towards the highlighted path. Police and SHE Teams are nearby.",
-      "Your emergency contacts have been notified. Continue straight — help is on the way.",
-      "Safe zone ahead. You're doing great. Help will reach you shortly."
-    ];
-
-    guidance.forEach((text, index) => {
-      setTimeout(() => {
-        handleVoiceCommand(text);
-        toast({
-          title: `Step ${index + 1}`,
-          description: text
-        });
-      }, index * 3000);
-    });
-  };
 
   return (
     <div className="min-h-screen bg-gradient-hero">
@@ -239,7 +129,7 @@ const CommunityFeatures: React.FC<CommunityFeaturesProps> = ({ onBack }) => {
         </div>
       </header>
 
-      <div className="max-w-md mx-auto p-4 space-y-6">
+      <div className="max-w-md mx-auto p-4 space-y-6 pb-24">
         {/* Community Section */}
         <Card className="shadow-soft">
           <CardHeader>
@@ -348,54 +238,6 @@ const CommunityFeatures: React.FC<CommunityFeaturesProps> = ({ onBack }) => {
           </CardContent>
         </Card>
 
-        {/* AI Safety Voice Guide */}
-        <Card className="shadow-soft">
-          <CardHeader>
-            <div className="flex items-center space-x-2">
-              <Navigation className="w-5 h-5 text-primary" />
-              <CardTitle className="text-lg text-foreground">AI Safety Voice Guide</CardTitle>
-            </div>
-            <p className="text-sm text-muted-foreground">Google Maps-style navigation with reassuring safety guidance</p>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex items-center justify-between">
-              <span className="text-sm font-medium text-foreground">Enable Voice Guidance</span>
-              <Switch checked={voiceGuidanceEnabled} onCheckedChange={setVoiceGuidanceEnabled} />
-            </div>
-
-            <div className="bg-muted/30 rounded-lg p-3">
-              <h4 className="font-semibold text-foreground mb-2">Sample Emergency Guidance:</h4>
-              <div className="space-y-2 text-sm">
-                <div className="flex items-start space-x-2">
-                  <Badge className="bg-destructive text-white">1</Badge>
-                  <span className="text-muted-foreground">"You are in danger. Stay calm. I am guiding you to the safest route."</span>
-                </div>
-                <div className="flex items-start space-x-2">
-                  <Badge className="bg-primary text-white">2</Badge>
-                  <span className="text-muted-foreground">"Move towards the highlighted path. Police and SHE Teams are nearby."</span>
-                </div>
-                <div className="flex items-start space-x-2">
-                  <Badge className="bg-success text-white">3</Badge>
-                  <span className="text-muted-foreground">"Your emergency contacts have been notified. Continue straight — help is on the way."</span>
-                </div>
-                <div className="flex items-start space-x-2">
-                  <Badge className="bg-accent text-white">4</Badge>
-                  <span className="text-muted-foreground">"Safe zone ahead. You're doing great. Help will reach you shortly."</span>
-                </div>
-              </div>
-            </div>
-
-            <Button
-              variant="hero"
-              onClick={testAIGuide}
-              className="w-full"
-              disabled={!voiceGuidanceEnabled}
-            >
-              <Volume2 className="w-4 h-4 mr-2" />
-              Test AI Safety Guide
-            </Button>
-          </CardContent>
-        </Card>
 
         {/* Smart Safe Routes */}
         <Card className="shadow-soft">
@@ -486,52 +328,6 @@ const CommunityFeatures: React.FC<CommunityFeaturesProps> = ({ onBack }) => {
           </CardContent>
         </Card>
 
-        {/* Voice Command Shortcuts */}
-        <Card className="shadow-soft">
-          <CardHeader>
-            <div className="flex items-center space-x-2">
-              <Mic className="w-5 h-5 text-primary" />
-              <CardTitle className="text-lg text-foreground">Voice Command Shortcuts</CardTitle>
-            </div>
-            <p className="text-sm text-muted-foreground">Quick voice-activated safety features</p>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-3">
-              <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg">
-                <div>
-                  <span className="font-medium text-foreground">"Hey SURAKSHA, Emergency"</span>
-                  <p className="text-xs text-muted-foreground">Trigger SOS</p>
-                </div>
-                <Badge variant="destructive">Emergency</Badge>
-              </div>
-
-              <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg">
-                <div>
-                  <span className="font-medium text-foreground">"Hey SURAKSHA, Safe Route"</span>
-                  <p className="text-xs text-muted-foreground">Start navigation</p>
-                </div>
-                <Badge variant="default">Navigation</Badge>
-              </div>
-
-              <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg">
-                <div>
-                  <span className="font-medium text-foreground">"Hey SURAKSHA, Call Help"</span>
-                  <p className="text-xs text-muted-foreground">Call emergency</p>
-                </div>
-                <Badge variant="secondary">Support</Badge>
-              </div>
-            </div>
-
-            <Button
-              variant={isListening ? "destructive" : "hero"}
-              onClick={startVoiceListening}
-              className="w-full"
-            >
-              <Mic className="w-4 h-4 mr-2" />
-              {isListening ? "Listening..." : "Start Voice Commands"}
-            </Button>
-          </CardContent>
-        </Card>
       </div>
     </div>
   );

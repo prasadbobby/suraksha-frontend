@@ -406,7 +406,7 @@ const LocationSharing: React.FC<LocationSharingProps> = ({ onBack }) => {
         </div>
       </header>
 
-      <div className="max-w-md mx-auto p-4 space-y-6">
+      <div className="max-w-md mx-auto p-4 space-y-6 pb-24">
         {/* Location Services */}
         <Card className="shadow-soft">
           <CardHeader className="flex flex-row items-center justify-between pb-4">

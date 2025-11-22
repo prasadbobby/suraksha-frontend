@@ -8,6 +8,7 @@ import EmergencySOS from './EmergencySOS';
 import Alerts from './Alerts';
 import SettingsPage from './SettingsPage';
 import Wellness from './Wellness';
+import ProfilePage from './ProfilePage';
 
 // Wrapper components that use the existing components with navigation
 export const EmergencyContactsRoute = () => {
@@ -48,4 +49,9 @@ export const SettingsPageRoute = () => {
 export const WellnessRoute = () => {
   const navigate = useNavigate();
   return <Wellness onBack={() => navigate('/')} />;
+};
+
+export const ProfileRoute = () => {
+  const navigate = useNavigate();
+  return <ProfilePage onBack={() => navigate('/')} />;
 };

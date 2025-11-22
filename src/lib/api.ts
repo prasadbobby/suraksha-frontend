@@ -210,10 +210,26 @@ class ApiService {
     name?: string;
     phone?: string;
     notificationToken?: string;
+    safetySettings?: any;
+    alertPreferences?: any;
   }) {
     return this.request<{ user: User }>('/user/profile', {
       method: 'PUT',
       body: JSON.stringify(profileData),
+    });
+  }
+
+  async updateSafetySettings(safetySettings: any) {
+    return this.request<{ user: User }>('/user/safety-settings', {
+      method: 'PUT',
+      body: JSON.stringify({ safetySettings }),
+    });
+  }
+
+  async updateAlertPreferences(alertPreferences: any) {
+    return this.request<{ user: User }>('/user/alert-preferences', {
+      method: 'PUT',
+      body: JSON.stringify({ alertPreferences }),
     });
   }
 
@@ -222,16 +238,36 @@ class ApiService {
     return this.request('/health');
   }
 
-  // Voice methods
-  async generateVoiceAudio(text: string, command?: string) {
-    return this.request('/voice/generate', {
+  // Firebase notification methods
+  async sendEmergencyNotification(emergencyData: {
+    userName: string;
+    userPhone?: string;
+    location?: { latitude: number; longitude: number; address?: string };
+    contactEmails: string[];
+  }) {
+    return this.request('/firebase/emergency', {
       method: 'POST',
-      body: JSON.stringify({ text, command })
+      body: JSON.stringify(emergencyData)
     });
   }
 
-  async getAvailableVoices() {
-    return this.request('/voice/voices');
+  async sendLocationNotification(locationData: {
+    userName: string;
+    location: { latitude: number; longitude: number; address?: string };
+    contactEmails: string[];
+    isLiveSharing?: boolean;
+  }) {
+    return this.request('/firebase/location', {
+      method: 'POST',
+      body: JSON.stringify(locationData)
+    });
+  }
+
+  async saveNotificationToken(token: string) {
+    return this.request('/firebase/token', {
+      method: 'POST',
+      body: JSON.stringify({ token })
+    });
   }
 }
 
@@ -258,6 +294,23 @@ export interface User {
   phone?: string;
   isActive: boolean;
   notificationToken?: string;
+  safetySettings?: {
+    notificationsEnabled: boolean;
+    locationSharingEnabled: boolean;
+    sosEnabled: boolean;
+    stealthMode: boolean;
+    autoRecording: boolean;
+    includeLocation: boolean;
+    biometricLock: boolean;
+  };
+  alertPreferences?: {
+    emergencyAlerts: boolean;
+    communityAlerts: boolean;
+    travelSafetyTips: boolean;
+    incidentReports: boolean;
+    generalSafetyTips: boolean;
+    weatherAlerts: boolean;
+  };
   createdAt: string;
   lastSeen: string;
 }
@@ -337,12 +390,15 @@ export const useProfile = () => {
   return useMemo(() => ({
     getUserProfile: apiService.getUserProfile.bind(apiService),
     updateUserProfile: apiService.updateUserProfile.bind(apiService),
+    updateSafetySettings: apiService.updateSafetySettings.bind(apiService),
+    updateAlertPreferences: apiService.updateAlertPreferences.bind(apiService),
   }), []); // ✅ Stable references
 };
 
-export const useVoice = () => {
+export const useFirebase = () => {
   return useMemo(() => ({
-    generateVoiceAudio: apiService.generateVoiceAudio.bind(apiService),
-    getAvailableVoices: apiService.getAvailableVoices.bind(apiService),
+    sendEmergencyNotification: apiService.sendEmergencyNotification.bind(apiService),
+    sendLocationNotification: apiService.sendLocationNotification.bind(apiService),
+    saveNotificationToken: apiService.saveNotificationToken.bind(apiService),
   }), []); // ✅ Stable references
 };

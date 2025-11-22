@@ -2,28 +2,13 @@ import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
-import { ArrowLeft, Heart, Navigation, Volume2, Phone, MapPin, Shield } from 'lucide-react';
+import { ArrowLeft, Heart, Navigation, Phone, MapPin, Shield } from 'lucide-react';
 
 interface WellnessProps {
   onBack: () => void;
 }
 
 const Wellness: React.FC<WellnessProps> = ({ onBack }) => {
-  const [voiceGuidanceEnabled, setVoiceGuidanceEnabled] = useState(true);
-  const [isNavigating, setIsNavigating] = useState(false);
-
-  const startSafeNavigation = () => {
-    setIsNavigating(true);
-    // Simulate navigation guidance
-    setTimeout(() => setIsNavigating(false), 5000);
-  };
-
-  const voiceGuidanceMessages = [
-    "You are in danger. Stay calm. I am guiding you to the safest route.",
-    "Move towards the highlighted path. Police and SHE Teams are nearby.",
-    "Your emergency contacts have been notified. Continue straight — help is on the way.",
-    "Safe zone ahead. You're doing great. Help will reach you shortly."
-  ];
 
   return (
     <div className="min-h-screen bg-gradient-hero">
@@ -48,55 +33,7 @@ const Wellness: React.FC<WellnessProps> = ({ onBack }) => {
         </div>
       </header>
 
-      <div className="max-w-md mx-auto p-4 space-y-6">
-        {/* AI Voice Guidance */}
-        <Card className="shadow-soft">
-          <CardHeader>
-            <CardTitle className="text-lg text-foreground flex items-center">
-              <Volume2 className="w-5 h-5 mr-2 text-primary" />
-              AI Safety Voice Guide
-            </CardTitle>
-            <p className="text-sm text-muted-foreground">Google Maps-style navigation with reassuring safety guidance</p>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <span className="text-sm font-medium text-foreground">Enable Voice Guidance</span>
-                <p className="text-xs text-muted-foreground">Calming AI voice during emergencies</p>
-              </div>
-              <Switch checked={voiceGuidanceEnabled} onCheckedChange={setVoiceGuidanceEnabled} />
-            </div>
-
-            {voiceGuidanceEnabled && (
-              <div className="space-y-3">
-                <div className="p-3 bg-primary/5 rounded-lg border border-primary/20">
-                  <h3 className="font-semibold text-primary mb-2">Sample Emergency Guidance:</h3>
-                  <div className="space-y-2">
-                    {voiceGuidanceMessages.map((message, index) => (
-                      <div key={index} className="flex items-start space-x-2">
-                        <div className="w-5 h-5 bg-primary/20 rounded-full flex items-center justify-center text-xs text-primary font-semibold mt-0.5">
-                          {index + 1}
-                        </div>
-                        <p className="text-sm text-foreground italic">"{message}"</p>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-                
-                <Button
-                  variant={isNavigating ? "emergency" : "hero"}
-                  size="lg"
-                  className="w-full"
-                  onClick={startSafeNavigation}
-                  disabled={isNavigating}
-                >
-                  <Navigation className="w-5 h-5 mr-2" />
-                  {isNavigating ? "🎯 AI Guide Active..." : "Test AI Safety Guide"}
-                </Button>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+      <div className="max-w-md mx-auto p-4 space-y-6 pb-24">
 
         {/* Smart Route Planning */}
         <Card className="shadow-soft">
@@ -172,45 +109,7 @@ const Wellness: React.FC<WellnessProps> = ({ onBack }) => {
           </CardContent>
         </Card>
 
-        {/* Emergency Voice Commands */}
-        <Card className="shadow-soft">
-          <CardHeader>
-            <CardTitle className="text-lg text-foreground">Voice Command Shortcuts</CardTitle>
-            <p className="text-sm text-muted-foreground">Quick voice-activated safety features</p>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-2 text-sm">
-              <div className="flex justify-between items-center p-2 bg-muted/20 rounded">
-                <span className="font-medium text-foreground">"Hey SURAKSHA, Emergency"</span>
-                <span className="text-xs text-muted-foreground">Trigger SOS</span>
-              </div>
-              <div className="flex justify-between items-center p-2 bg-muted/20 rounded">
-                <span className="font-medium text-foreground">"Hey SURAKSHA, Safe Route"</span>
-                <span className="text-xs text-muted-foreground">Start navigation</span>
-              </div>
-              <div className="flex justify-between items-center p-2 bg-muted/20 rounded">
-                <span className="font-medium text-foreground">"Hey SURAKSHA, Call Help"</span>
-                <span className="text-xs text-muted-foreground">Call emergency</span>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
 
-        {isNavigating && (
-          <Card className="shadow-emergency border-2 border-primary bg-primary/5 animate-pulse">
-            <CardContent className="p-4 text-center">
-              <div className="space-y-2">
-                <div className="w-12 h-12 bg-gradient-primary rounded-full flex items-center justify-center mx-auto">
-                  <Navigation className="w-6 h-6 text-primary-foreground animate-pulse" />
-                </div>
-                <h3 className="font-bold text-primary">AI Safety Guide Active</h3>
-                <p className="text-sm text-foreground italic">
-                  "You are safe. I'm guiding you to the safest route. Stay calm and follow the highlighted path."
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-        )}
       </div>
     </div>
   );

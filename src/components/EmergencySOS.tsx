@@ -17,7 +17,7 @@ import {
 } from 'lucide-react';
 import { useShakeDetection } from '@/hooks/use-shake-detection';
 import { useToast } from '@/hooks/use-toast';
-import { useEmergency, useLocation } from '@/lib/api';
+import { useEmergency, useLocation, useContacts, useFirebase, Contact } from '@/lib/api';
 
 interface EmergencySOSProps {
   onBack: () => void;
@@ -35,10 +35,13 @@ const EmergencySOS: React.FC<EmergencySOSProps> = ({ onBack }) => {
     address?: string;
   } | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [trustedContacts, setTrustedContacts] = useState<Contact[]>([]);
 
   const { toast } = useToast();
   const { sendEmergencyAlert } = useEmergency();
   const { updateLocation } = useLocation();
+  const { getContacts } = useContacts();
+  const { sendEmergencyNotification } = useFirebase();
 
   // Emergency contacts with She Team
   const emergencyContacts = [
@@ -52,11 +55,23 @@ const EmergencySOS: React.FC<EmergencySOSProps> = ({ onBack }) => {
     { name: 'Anti-Ragging Helpline', number: '1800-180-5522', color: 'bg-green-500', priority: 3 }
   ];
 
-  const trustedContacts = [
-    { name: 'Mom', number: '+91 98765 43210', relation: 'Mother' },
-    { name: 'Sister Priya', number: '+91 98765 43211', relation: 'Sister' },
-    { name: 'Best Friend Anjali', number: '+91 98765 43212', relation: 'Friend' }
-  ];
+  // Load trusted contacts from ContactsManager
+  useEffect(() => {
+    loadTrustedContacts();
+  }, []);
+
+  const loadTrustedContacts = async () => {
+    try {
+      const response = await getContacts();
+      if (response.success && response.contacts) {
+        // Filter for trusted contacts only
+        const trusted = response.contacts.filter(contact => contact.isTrusted);
+        setTrustedContacts(trusted);
+      }
+    } catch (error) {
+      console.error('Error loading trusted contacts:', error);
+    }
+  };
 
   // Get current location
   const getCurrentLocation = (): Promise<{ latitude: number; longitude: number; address?: string } | null> => {
@@ -149,6 +164,35 @@ const EmergencySOS: React.FC<EmergencySOSProps> = ({ onBack }) => {
           });
         }
 
+        // Send Firebase push notifications to trusted contacts with app accounts
+        try {
+          const contactEmails = trustedContacts
+            .filter(contact => contact.email && contact.email.trim() !== '')
+            .map(contact => contact.email);
+
+          if (contactEmails.length > 0) {
+            const firebaseResponse = await sendEmergencyNotification({
+              userName: 'User', // You can get this from user profile if available
+              userPhone: undefined, // You can get this from user profile if available
+              location: location || undefined,
+              contactEmails
+            });
+
+            if (firebaseResponse.success) {
+              console.log(`📱 Firebase notifications sent: ${firebaseResponse.notificationsSent}`);
+              console.log(`❌ Firebase notifications failed: ${firebaseResponse.notificationsFailed}`);
+            } else if (firebaseResponse.error === 'Firebase not initialized') {
+              console.log('⚠️ Firebase not configured - push notifications disabled');
+              console.log('ℹ️ Emergency alerts are still working via SMS/email');
+            }
+          } else {
+            console.log('⚠️ No trusted contacts with email addresses for Firebase notifications');
+          }
+        } catch (firebaseError) {
+          console.error('❌ Firebase notification error:', firebaseError);
+          // Don't fail the entire emergency process if Firebase notifications fail
+        }
+
         if (sirenMode && audioEnabled) {
           console.log('🚨 SIREN ACTIVATED');
           // Here you could implement actual siren sounds
@@ -156,7 +200,7 @@ const EmergencySOS: React.FC<EmergencySOSProps> = ({ onBack }) => {
 
         toast({
           title: "✅ Emergency Alert Sent!",
-          description: `Notified ${response.contactsNotified || 0} trusted contacts. ${response.notificationsSent || 0} notifications delivered.`,
+          description: `Notified ${response.contactsNotified || 0} trusted contacts via SMS/email. Firebase notifications sent to app users.`,
         });
 
         console.log('✅ Emergency actions completed:', {
@@ -271,7 +315,7 @@ const EmergencySOS: React.FC<EmergencySOSProps> = ({ onBack }) => {
         </div>
       </header>
 
-      <div className="max-w-md mx-auto p-4 space-y-6">
+      <div className="max-w-md mx-auto p-4 space-y-6 pb-24">
         {/* Emergency SOS Button */}
         <Card className={`shadow-soft transition-all duration-300 ${emergencyActive ? 'bg-destructive/10 border-destructive' : ''}`}>
           <CardContent className="p-6 text-center">
@@ -423,30 +467,50 @@ const EmergencySOS: React.FC<EmergencySOSProps> = ({ onBack }) => {
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
-              {trustedContacts.map((contact, index) => (
-                <div
-                  key={index}
-                  className="flex items-center justify-between p-3 bg-card rounded-lg border border-border"
-                >
-                  <div className="flex items-center space-x-3">
-                    <div className="w-10 h-10 bg-primary rounded-full flex items-center justify-center text-white font-semibold">
-                      {contact.name[0]}
-                    </div>
-                    <div>
-                      <h3 className="font-semibold text-foreground">{contact.name}</h3>
-                      <p className="text-sm text-muted-foreground">{contact.relation}</p>
-                    </div>
-                  </div>
+              {trustedContacts.length === 0 ? (
+                <div className="text-center py-6">
+                  <Users className="w-12 h-12 text-muted-foreground mx-auto mb-3" />
+                  <h3 className="font-semibold text-foreground mb-1">No Trusted Contacts</h3>
+                  <p className="text-sm text-muted-foreground mb-3">
+                    Add trusted contacts to receive emergency notifications
+                  </p>
                   <Button
                     size="sm"
-                    variant="secondary"
-                    onClick={() => callEmergencyNumber(contact.number, contact.name)}
+                    variant="outline"
+                    onClick={() => window.location.href = '/contacts'}
                   >
-                    <Phone className="w-4 h-4 mr-1" />
-                    Call
+                    Manage Contacts
                   </Button>
                 </div>
-              ))}
+              ) : (
+                trustedContacts.map((contact, index) => (
+                  <div
+                    key={contact._id || contact.id || index}
+                    className="flex items-center justify-between p-3 bg-card rounded-lg border border-border"
+                  >
+                    <div className="flex items-center space-x-3">
+                      <div className="w-10 h-10 bg-primary rounded-full flex items-center justify-center text-white font-semibold">
+                        {contact.name[0]}
+                      </div>
+                      <div>
+                        <h3 className="font-semibold text-foreground">{contact.name}</h3>
+                        <p className="text-sm text-muted-foreground">{contact.relation}</p>
+                        {contact.email && (
+                          <p className="text-xs text-muted-foreground">✓ App notifications enabled</p>
+                        )}
+                      </div>
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onClick={() => callEmergencyNumber(contact.phone, contact.name)}
+                    >
+                      <Phone className="w-4 h-4 mr-1" />
+                      Call
+                    </Button>
+                  </div>
+                ))
+              )}
             </div>
           </CardContent>
         </Card>

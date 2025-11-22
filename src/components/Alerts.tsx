@@ -1,22 +1,55 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
-import { ArrowLeft, Bell, MapPin, Clock, Navigation } from 'lucide-react';
+import { ArrowLeft, Bell, MapPin, Clock, Navigation, AlertTriangle, Cloud } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
+import { useProfile, useAuth, type User } from '@/lib/api';
 
 interface AlertsProps {
   onBack: () => void;
 }
 
 const Alerts: React.FC<AlertsProps> = ({ onBack }) => {
+  const { toast } = useToast();
+  const { getUserProfile, updateAlertPreferences } = useProfile();
+  const { getCurrentUser } = useAuth();
+
+  const [loading, setLoading] = useState(true);
   const [alertSettings, setAlertSettings] = useState({
     emergencyAlerts: true,
     communityAlerts: true,
-    safetyTips: true,
-    weatherAlerts: false,
-    travelTips: true,
-    incidentReports: true
+    travelSafetyTips: true,
+    weatherAlerts: true,
+    incidentReports: true,
+    generalSafetyTips: false
   });
+
+  useEffect(() => {
+    loadUserAlertPreferences();
+  }, []);
+
+  const loadUserAlertPreferences = async () => {
+    try {
+      setLoading(true);
+
+      // Try to get user profile from API
+      const response = await getUserProfile();
+
+      if (response.success && response.data?.user?.alertPreferences) {
+        setAlertSettings(response.data.user.alertPreferences);
+      }
+    } catch (error) {
+      console.error('Failed to load alert preferences:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load alert preferences. Using defaults.",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const recentAlerts = [
     { 
@@ -42,8 +75,37 @@ const Alerts: React.FC<AlertsProps> = ({ onBack }) => {
     }
   ];
 
-  const updateSetting = (key: keyof typeof alertSettings) => {
-    setAlertSettings(prev => ({ ...prev, [key]: !prev[key] }));
+  const updateSetting = async (key: keyof typeof alertSettings) => {
+    const newValue = !alertSettings[key];
+
+    try {
+      // Update local state immediately for better UX
+      setAlertSettings(prev => ({ ...prev, [key]: newValue }));
+
+      // Save to backend
+      const response = await updateAlertPreferences({
+        [key]: newValue
+      });
+
+      if (response.success) {
+        toast({
+          title: "Preference Updated",
+          description: `${key.replace(/([A-Z])/g, ' $1').toLowerCase()} has been ${newValue ? 'enabled' : 'disabled'}.`,
+        });
+      } else {
+        throw new Error(response.error || 'Failed to update preference');
+      }
+    } catch (error) {
+      // Revert the change if it failed
+      setAlertSettings(prev => ({ ...prev, [key]: !newValue }));
+
+      console.error('Failed to update alert preference:', error);
+      toast({
+        title: "Error",
+        description: "Failed to save preference. Please try again.",
+        variant: "destructive"
+      });
+    }
   };
 
   return (
@@ -69,7 +131,15 @@ const Alerts: React.FC<AlertsProps> = ({ onBack }) => {
         </div>
       </header>
 
-      <div className="max-w-md mx-auto p-4 space-y-6">
+      <div className="max-w-md mx-auto p-4 space-y-6 pb-24">
+        {/* Loading State */}
+        {loading ? (
+          <div className="text-center py-8">
+            <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+            <p className="text-muted-foreground">Loading alert preferences...</p>
+          </div>
+        ) : (
+          <>
         {/* Alert Preferences */}
         <Card className="shadow-soft">
           <CardHeader>
@@ -98,7 +168,7 @@ const Alerts: React.FC<AlertsProps> = ({ onBack }) => {
                 <span className="text-sm font-medium text-foreground">Travel Safety Tips</span>
                 <p className="text-xs text-muted-foreground">Location-based safety advice</p>
               </div>
-              <Switch checked={alertSettings.travelTips} onCheckedChange={() => updateSetting('travelTips')} />
+              <Switch checked={alertSettings.travelSafetyTips} onCheckedChange={() => updateSetting('travelSafetyTips')} />
             </div>
             
             <div className="flex items-center justify-between">
@@ -114,7 +184,7 @@ const Alerts: React.FC<AlertsProps> = ({ onBack }) => {
                 <span className="text-sm font-medium text-foreground">General Safety Tips</span>
                 <p className="text-xs text-muted-foreground">Daily safety recommendations</p>
               </div>
-              <Switch checked={alertSettings.safetyTips} onCheckedChange={() => updateSetting('safetyTips')} />
+              <Switch checked={alertSettings.generalSafetyTips} onCheckedChange={() => updateSetting('generalSafetyTips')} />
             </div>
             
             <div className="flex items-center justify-between">
@@ -205,6 +275,8 @@ const Alerts: React.FC<AlertsProps> = ({ onBack }) => {
             </div>
           </CardContent>
         </Card>
+          </>
+        )}
       </div>
     </div>
   );

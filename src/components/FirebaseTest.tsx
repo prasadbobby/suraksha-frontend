@@ -2,9 +2,10 @@ import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, Check, X, Bell, Database, Shield, Cloud } from 'lucide-react';
+import { ArrowLeft, Check, X, Bell, Database, Shield, Cloud, Zap, Send } from 'lucide-react';
 import { requestNotificationPermission, createUserProfile, getUserProfile, auth } from '@/lib/firebase';
 import { useToast } from '@/hooks/use-toast';
+import { useFirebase, useAuth } from '@/lib/api';
 
 interface FirebaseTestProps {
   onBack: () => void;
@@ -15,6 +16,8 @@ const FirebaseTest: React.FC<FirebaseTestProps> = ({ onBack }) => {
   const [notificationStatus, setNotificationStatus] = useState<'pending' | 'granted' | 'denied'>('pending');
   const [testResults, setTestResults] = useState<{[key: string]: boolean}>({});
   const { toast } = useToast();
+  const { saveNotificationToken, sendEmergencyNotification } = useFirebase();
+  const { getCurrentUser } = useAuth();
 
   const testNotificationPermission = async () => {
     try {
@@ -117,19 +120,96 @@ const FirebaseTest: React.FC<FirebaseTestProps> = ({ onBack }) => {
     }
   };
 
+  const testTokenSaving = async () => {
+    try {
+      if (!notificationToken) {
+        throw new Error('No notification token available. Run notification test first.');
+      }
+
+      const result = await saveNotificationToken(notificationToken);
+
+      if (result.success) {
+        setTestResults(prev => ({...prev, tokenSaving: true}));
+
+        toast({
+          title: "✅ Token Saved to Backend",
+          description: "Notification token successfully stored in MongoDB!"
+        });
+      } else {
+        throw new Error(result.error || 'Failed to save token');
+      }
+    } catch (error) {
+      console.error('Token saving test failed:', error);
+      setTestResults(prev => ({...prev, tokenSaving: false}));
+
+      toast({
+        title: "❌ Token Saving Failed",
+        description: error instanceof Error ? error.message : "Unable to save token to backend",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const testEmergencyNotification = async () => {
+    try {
+      const currentUser = getCurrentUser();
+      if (!currentUser) {
+        throw new Error('User not logged in. Please log into SURAKSHA first.');
+      }
+
+      const emergencyData = {
+        userName: currentUser.name || 'Test User',
+        userPhone: currentUser.phone,
+        location: {
+          latitude: 17.441759,
+          longitude: 78.650033,
+          address: 'Test Location, Hyderabad, India'
+        },
+        contactEmails: [currentUser.email] // Send test notification to self
+      };
+
+      const result = await sendEmergencyNotification(emergencyData);
+
+      if (result.success) {
+        setTestResults(prev => ({...prev, emergencyNotification: true}));
+
+        toast({
+          title: "✅ Emergency Notification Sent",
+          description: `Sent to ${result.notificationsSent || 0} contacts. Check your devices!`
+        });
+      } else {
+        throw new Error(result.error || 'Failed to send emergency notification');
+      }
+    } catch (error) {
+      console.error('Emergency notification test failed:', error);
+      setTestResults(prev => ({...prev, emergencyNotification: false}));
+
+      toast({
+        title: "❌ Emergency Notification Failed",
+        description: error instanceof Error ? error.message : "Unable to send emergency notification",
+        variant: "destructive"
+      });
+    }
+  };
+
   const runAllTests = async () => {
     setTestResults({});
 
     toast({
-      title: "🧪 Running Firebase Tests",
-      description: "Testing all Firebase services..."
+      title: "🧪 Running Comprehensive Tests",
+      description: "Testing Firebase, backend, and notification pipeline..."
     });
 
-    await Promise.all([
-      testAuthentication(),
-      testFirestoreConnection(),
-      testNotificationPermission()
-    ]);
+    // Run tests in sequence to avoid overwhelming the system
+    await testAuthentication();
+    await testFirestoreConnection();
+    await testNotificationPermission();
+
+    // Only run token saving and emergency tests if notification permission was granted
+    if (notificationToken) {
+      await testTokenSaving();
+      await testEmergencyNotification();
+    }
   };
 
   const getStatusIcon = (status: boolean | undefined) => {
@@ -242,6 +322,28 @@ const FirebaseTest: React.FC<FirebaseTestProps> = ({ onBack }) => {
                 </div>
                 {getStatusBadge(testResults.notifications)}
               </div>
+
+              <div className="flex items-center justify-between p-3 bg-card rounded-lg border border-border">
+                <div className="flex items-center space-x-3">
+                  {getStatusIcon(testResults.tokenSaving)}
+                  <div>
+                    <h3 className="font-semibold text-foreground">Backend Token Sync</h3>
+                    <p className="text-sm text-muted-foreground">Save token to MongoDB</p>
+                  </div>
+                </div>
+                {getStatusBadge(testResults.tokenSaving)}
+              </div>
+
+              <div className="flex items-center justify-between p-3 bg-card rounded-lg border border-border">
+                <div className="flex items-center space-x-3">
+                  {getStatusIcon(testResults.emergencyNotification)}
+                  <div>
+                    <h3 className="font-semibold text-foreground">Emergency Notifications</h3>
+                    <p className="text-sm text-muted-foreground">End-to-end notification test</p>
+                  </div>
+                </div>
+                {getStatusBadge(testResults.emergencyNotification)}
+              </div>
             </div>
 
             <Button
@@ -291,6 +393,32 @@ const FirebaseTest: React.FC<FirebaseTestProps> = ({ onBack }) => {
               <span>Test Notifications</span>
             </div>
             {getStatusIcon(testResults.notifications)}
+          </Button>
+
+          <Button
+            variant="outline"
+            onClick={testTokenSaving}
+            className="h-12 justify-between"
+            disabled={!notificationToken}
+          >
+            <div className="flex items-center space-x-2">
+              <Zap className="w-4 h-4" />
+              <span>Save Token to Backend</span>
+            </div>
+            {getStatusIcon(testResults.tokenSaving)}
+          </Button>
+
+          <Button
+            variant="outline"
+            onClick={testEmergencyNotification}
+            className="h-12 justify-between bg-red-50 border-red-200 hover:bg-red-100"
+            disabled={!notificationToken}
+          >
+            <div className="flex items-center space-x-2">
+              <Send className="w-4 h-4 text-red-600" />
+              <span>Test Emergency Alert</span>
+            </div>
+            {getStatusIcon(testResults.emergencyNotification)}
           </Button>
         </div>
 
